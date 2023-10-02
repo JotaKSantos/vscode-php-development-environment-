@@ -1,0 +1,93 @@
+FROM php:8.2.8-fpm
+
+COPY --from=mlocati/php-extension-installer:latest /usr/bin/install-php-extensions /usr/bin/
+
+RUN apt upgrade -y
+
+RUN apt update && apt install git unzip -y && \
+    apt-get clean autoclean; apt-get autoremove --yes; rm -rf /var/lib/{apt,dpkg,cache,log}/
+
+# Install system dependencies
+RUN apt-get install -y \
+    git \
+    curl \
+    libfreetype6-dev \
+    libjpeg62-turbo-dev \
+    libpng-dev \
+    libonig-dev \
+    libxml2-dev \
+    libzip-dev \
+    libssl-dev \
+    libxslt-dev \
+    zip \
+    unzip \
+    vim \
+    zsh \
+    default-mysql-client \
+    supervisor \
+    wget
+
+RUN curl -sL https://deb.nodesource.com/setup_14.x -o nodesource_setup.sh
+RUN bash nodesource_setup.sh
+
+RUN apt-get update && apt-get install -y \
+    nodejs
+
+RUN curl https://dl.yarnpkg.com/debian/pubkey.gpg | apt-key add -
+RUN echo "deb https://dl.yarnpkg.com/debian/ stable main" | tee /etc/apt/sources.list.d/yarn.list
+RUN apt update && apt install yarn
+
+# Clear cache
+RUN apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# configure, install and enable all php packages
+RUN docker-php-ext-configure gd --enable-gd --with-freetype --with-jpeg
+
+# Install PHP extensions
+RUN docker-php-ext-install pdo_mysql pdo mbstring exif pcntl bcmath gd zip
+
+RUN cd /usr/local/etc/php/conf.d/ && \
+  echo 'upload_max_filesize = 100M' >> /usr/local/etc/php/conf.d/docker-php-limits.ini && \
+  echo 'post_max_size = 120M' >> /usr/local/etc/php/conf.d/docker-php-limits.ini && \
+  echo 'memory_limit = 1024M' >> /usr/local/etc/php/conf.d/docker-php-limits.ini && \
+  echo 'variables_order = "EGPCS"' >> /usr/local/etc/php/conf.d/docker-php-limits.ini && \
+  echo 'date.timezone = "America/Sao_Paulo"' >> /usr/local/etc/php/conf.d/docker-php-limits.ini
+
+#ativando o xdebug
+RUN install-php-extensions gd xdebug
+
+RUN apt-get update && apt-get install -y libmagickwand-dev --no-install-recommends
+RUN pecl install imagick
+RUN docker-php-ext-enable imagick
+
+ENV DOCKERIZE_VERSION v0.6.1
+RUN wget https://github.com/jwilder/dockerize/releases/download/$DOCKERIZE_VERSION/dockerize-alpine-linux-amd64-$DOCKERIZE_VERSION.tar.gz \
+    && tar -C /usr/local/bin -xzvf dockerize-alpine-linux-amd64-$DOCKERIZE_VERSION.tar.gz \
+    && rm dockerize-alpine-linux-amd64-$DOCKERIZE_VERSION.tar.gz
+    
+# Get latest Composer
+COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
+
+# Set working directory
+WORKDIR /var/www
+COPY ../. .
+COPY ../.env.prod .env
+
+RUN chown -R www-data:www-data /var/www
+
+### Supervisor permite monitorar e controlar vários processos (LINUX)
+### Bastante utilizado para manter processos em Daemon, ou seja, executando em segundo plano
+COPY ../.docker/supervisord/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+#COPY ../.docker/supervisord/conf /etc/supervisord.d/
+
+RUN composer install
+RUN yarn install && yarn run build
+
+RUN apt-get install nginx -y
+RUN rm -rf /etc/nginx/sites-enabled/* && rm -rf /etc/nginx/sites-available/*
+COPY ../.docker/nginx/sites.conf /etc/nginx/sites-enabled/default.conf
+COPY ../.docker/nginx/error.html /var/www/html/error.html
+
+#USER www-data
+
+CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/supervisord.conf"]

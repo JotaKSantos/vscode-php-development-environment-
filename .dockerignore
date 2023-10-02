@@ -1,0 +1,15 @@
+.git
+.idea
+storage/logs
+storage/cache
+.docker/mysql
+.devcontainer
+node_modules
+vendor
+.env
+.env.example
+.gitattributes
+.gitignore
+Readme.md
+public/build
+public/hot
