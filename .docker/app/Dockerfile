@@ -45,9 +45,10 @@ RUN apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # configure, install and enable all php packages
 RUN docker-php-ext-configure gd --enable-gd --with-freetype --with-jpeg
+RUN docker-php-ext-configure intl
 
 # Install PHP extensions
-RUN docker-php-ext-install pdo_mysql pdo mbstring exif pcntl bcmath gd zip
+RUN docker-php-ext-install pdo_mysql pdo mbstring exif pcntl bcmath gd zip intl
 
 RUN cd /usr/local/etc/php/conf.d/ && \
   echo 'upload_max_filesize = 100M' >> /usr/local/etc/php/conf.d/docker-php-limits.ini && \
