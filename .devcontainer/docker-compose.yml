@@ -1,7 +1,7 @@
 version: "3.7"
 services:
   app:
-    image: jksantos/php8.2:1.0
+    image: jksantos/php8.3.6:1.1
     container_name: app
     restart: unless-stopped
     working_dir: /var/www/
@@ -17,7 +17,7 @@ services:
       TZ: "America/Sao_Paulo"
 
   db:
-    image: mysql:5.7.39
+    image: mysql:8.0.36
     container_name: db
     restart: unless-stopped
     ports:
